@@ -30,17 +30,9 @@ namespace cmdline {
             default_ = std::make_unique<T>(v);
             return this;
         }
-        abstract_value<T>* implicit_value(bool implicit = true) {
-            implicit_ = implicit;
-            return this;
-        }
 
         bool has_default() const noexcept {
             return default_ != nullptr;
-        }
-
-        bool is_implicit() const noexcept {
-            return implicit_;
         }
 
         virtual const basic_validator* get_validator() const {
@@ -48,7 +40,6 @@ namespace cmdline {
         }
 
         private:
-        bool implicit_;
         std::unique_ptr<T> default_;
         validator<T> validator_;
     };
@@ -57,7 +48,7 @@ namespace cmdline {
     abstract_value<T>* value() {
         return new abstract_value<T>();
     }
-    
+
     template<typename T>
     abstract_value<T>* value(const T& v = T{}) {
         return new abstract_value<T>(v);

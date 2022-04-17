@@ -5,6 +5,11 @@ namespace cmdline {
             const char shortName,
             const std::string& longName,
             const std::string description,
-            std::unique_ptr<basic_value> value)
-        : shortName_(shortName), longName_(longName), desc_(description), value_(std::move(value)) {}
+            std::unique_ptr<basic_value> value,
+            bool implicit)
+        : shortName_(shortName),
+          longName_(longName),
+          desc_(description),
+          value_(std::move(value)),
+          implicit_(implicit) {}
 }

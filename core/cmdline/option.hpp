@@ -12,7 +12,8 @@ namespace cmdline {
             const char shortName,
             const std::string& longName,
             const std::string description = std::string(),
-            std::unique_ptr<basic_value> value = nullptr);
+            std::unique_ptr<basic_value> value = nullptr,
+            bool implicit = false);
 
         inline bool has_long_name() const noexcept {
             return longName_ != "";
@@ -25,6 +26,7 @@ namespace cmdline {
         const std::string longName_;
         const std::string desc_;
         std::unique_ptr<basic_value> value_;
+        const bool implicit_;
     };
 }
 
