@@ -11,7 +11,7 @@ namespace cmdline {
         public:
 
         abstract_value() {
-            default_value(T());
+            default_ = nullptr;
         }
 
         abstract_value(const T& d) {
@@ -53,6 +53,11 @@ namespace cmdline {
         validator<T> validator_;
     };
 
+    template<typename T>
+    abstract_value<T>* value() {
+        return new abstract_value<T>();
+    }
+    
     template<typename T>
     abstract_value<T>* value(const T& v = T{}) {
         return new abstract_value<T>(v);
