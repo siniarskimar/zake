@@ -17,7 +17,7 @@ import subprocess
 
 __scriptdir__ = Path(__file__).parent
 
-sources = glob.glob("core/**.cpp", root_dir=__scriptdir__)
+sources = Path(__scriptdir__, "core").rglob("*.cpp")
 includedirs = [
     Path(__scriptdir__, "include")
 ]
@@ -25,7 +25,7 @@ includedirs = [
 cmd_args = []
 
 for src in sources:
-    cmd_args.append(src)
+    cmd_args.append(str(src))
 
 cmd_args.append("-o")
 cmd_args.append("zake")
@@ -33,7 +33,7 @@ cmd_args.append("zake")
 for dir in includedirs:
     cmd_args.append("-I{}".format(str(dir)))
 
-cmd = "g++ {}".format(" ".join(cmd_args))
+cmd = "g++ {} -g".format(" ".join(cmd_args))
 print(cmd)
 
 subprocess.run(cmd, shell=True, check=True)
