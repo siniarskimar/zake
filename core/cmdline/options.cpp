@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <deque>
 #include <cctype>
+#include <exception>
+#include <stdexcept>
 
 namespace cmdline {
     options::options(
@@ -32,7 +34,7 @@ namespace cmdline {
         std::string longName = "";
         it = name.find_last_of(',');
         if(it != std::string::npos) {
-            longName = name.substr(it, name.size() - it);
+            longName = name.substr(it + 1, name.size() - it - 1);
         } else {
             longName = name;
         }
@@ -83,16 +85,16 @@ namespace cmdline {
     }
 
     const parse_result options::parse(int argc, const char* argv[]) {
-        enum {POSITIONAL, OPT, VALUE} state = POSITIONAL;
+        enum {POSITIONAL, VALUE, OPT_SHORT, OPT_LONG} state = POSITIONAL;
         parse_result result;
         std::deque<std::string> queue;
-        std::shared_ptr<option> option = nullptr;
+        std::shared_ptr<option> resOpt = nullptr;
         int i = 1;
         int positionalIndex = 0;
         bool terminated = false;
 
-        while(i < argc) {
-            if(queue.empty()) {
+        while(i < argc || !queue.empty() || state == VALUE) {
+            if(queue.empty() && i < argc) {
                 queue.push_back(argv[i]);
                 i++;
             }
@@ -101,19 +103,21 @@ namespace cmdline {
                 case POSITIONAL: {
                     auto& arg = queue.front();
                     if(arg[0] == '-' && !terminated) {
-                        if(arg.size() == 1 || (arg.size() <= 2 && arg[1] == '-')) {
+                        if(arg.size() <= 2 && arg[1] == '-') {
                             state = POSITIONAL;
                             terminated = true;
                             break;
                         }
-                        if(std::isalpha(arg[1]) || arg[1] == '-') {
-                            state = OPT;
-                            break;
+                        if(arg[1] == '-') {
+                            state = OPT_LONG;
+                        } else {
+                            state = OPT_SHORT;
                         }
+                        break;
                     }
 
                     if(positionalIndex < positionals_.size()) {
-                        option = positionals_[positionalIndex];
+                        resOpt = positionals_[positionalIndex];
                         positionalIndex++;
                         state = VALUE;
                         break;
@@ -121,8 +125,11 @@ namespace cmdline {
                     queue.pop_front();
                     break;
                 }
-                case OPT: {
+                case OPT_LONG: {
                     auto& arg = queue.front();
+
+                    // check if we have to deal with equals sign
+                    // if so, split argument into two
                     auto equalsIter = arg.find_first_of('=');
                     if(equalsIter != std::string::npos) {
                         auto opt = arg.substr(0, equalsIter);
@@ -132,64 +139,85 @@ namespace cmdline {
                         queue.push_back(val);
                         break;
                     }
-                    std::string name;
-                    size_t j = 0;
-                    if(arg[j] == '-') {
-                        j++;
-                    }
-                    if(arg[j] == '-') {
-                        j++;
-                    }
-                    name = arg.substr(j, arg.size() - j);
-                    queue.pop_front();
-                    
-                    if(j >= 2) {
-                        // We have moved j by two hyphens
-                        // which means a long option only
 
-                        auto opt = find_option(name);
+                    std::string name = arg.substr(2, arg.size() - 2);
+                    queue.pop_front();
+
+                    auto opt = find_option(name);
+                    if(opt != nullptr) {
+                        resOpt = opt;
+                        if(opt->value_ == nullptr) {
+                            result.insert(name, typed_value());
+                            state = POSITIONAL;
+                        } else {
+                            state = VALUE;
+                        }
+                    }
+                    break;
+                }
+                case OPT_SHORT: {
+                    auto& arg = queue.front();
+                    std::string name = arg.substr(1, arg.size() - 1);
+                    queue.pop_front();
+
+                    if(name.size() == 1) {
+                        auto opt = find_short_option(name[0]);
                         if(opt != nullptr) {
-                            option = opt;
+                            resOpt = opt;
                             if(opt->value_ == nullptr) {
+                                result.insert(opt->longName_, typed_value());
                                 state = POSITIONAL;
                             } else {
                                 state = VALUE;
                             }
-                            queue.pop_front();
                         }
                         break;
+                    }
 
-                    } else {
-                        // one hyphen, prioritize long options first
-                        // if we don't find one that means it might be a short option
-
-                        auto opt = find_option(name);
+                    // make sure option with a value is last
+                    std::shared_ptr<option> vopt = nullptr;
+                    for(char sn : name) {
+                        auto opt = find_short_option(sn);
                         if(opt != nullptr) {
-                            option = opt;
+                            resOpt = opt;
                             if(opt->value_ == nullptr) {
+                                result.insert(opt->longName_, typed_value());
                                 state = POSITIONAL;
                             } else {
-                                state = VALUE;
-                            }
-                            queue.pop_front();
-                            break;
-                        }
-
-                        for(char sn : name) {
-                            auto opt = find_short_option(sn);
-                            if(opt != nullptr) {
-
+                                if(vopt != nullptr) {
+                                    throw std::runtime_error("two short options with values can not be joined together");
+                                }
+                                vopt = opt;
                             }
                         }
+                    }
+
+                    if(vopt != nullptr) {
+                        resOpt = vopt;
+                        state = VALUE;
                     }
 
                     break;
                 }
                 case VALUE: {
                     auto& arg = queue.front();
+                    if(resOpt->value_ == nullptr) {
+                        // Something is fudged up
+                        throw std::runtime_error("internal logic error");
+                    }
+                    auto v = resOpt->value_->get_validator()->validate(arg);
+                    auto defaultV = resOpt->value_->get_default_value();
 
-
-                    
+                    if(v.type() == typeid(std::nullptr_t)) {
+                        if(defaultV.type() != typeid(std::nullptr_t)) {
+                            v = defaultV;
+                        } else {
+                            std::string error = "Couldn't parse argument value '" + arg + "'";
+                            throw std::runtime_error(error);
+                        }
+                    }
+                    result.insert(resOpt->longName_, typed_value(v));
+                    state = POSITIONAL;
                     break;
                 }
             }

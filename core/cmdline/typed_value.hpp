@@ -8,7 +8,8 @@ namespace cmdline {
     class typed_value : public basic_value {
         public:
         typed_value() = default;
-        typed_value(std::any v);
+        typed_value(std::any v)
+            : v_(v) {}
 
         const std::type_info& type() const noexcept override {
             return v_.type();

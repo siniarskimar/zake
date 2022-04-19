@@ -11,6 +11,9 @@ namespace cmdline {
         virtual const basic_validator* get_validator() const {
             return nullptr;
         };
+        virtual const std::any get_default_value() const {
+            return nullptr;
+        }
         virtual bool is_abstract() const noexcept {
             return false;
         };

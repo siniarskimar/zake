@@ -39,6 +39,10 @@ namespace cmdline {
             return &validator_;
         }
 
+        virtual const std::any get_default_value() const {
+            return std::make_any<T>(*default_);
+        }
+
         private:
         std::unique_ptr<T> default_;
         validator<T> validator_;
