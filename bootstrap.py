@@ -18,7 +18,7 @@ import subprocess
 
 __scriptdir__ = Path(__file__).parent
 
-sources = Path(__scriptdir__, "core").rglob("*.cpp")
+sources = list(Path(__scriptdir__, "core").rglob("*.cpp"))
 includedirs = [
     Path(__scriptdir__, "include"),
     Path(__scriptdir__, "lua", "src")
@@ -94,25 +94,23 @@ def _build_lua():
     
     os.chdir(__scriptdir__)
     
+def build():
+    _build_lua()
+    incdirs = map((lambda d: '-I'+str(d)), includedirs)
+    srcs = map((lambda s: str(s)), sources)
+    cmd_args = []
 
-_build_lua()
+    cmd_args += [
+        f"-L{Path(__scriptdir__, 'lua', 'src')} "
+        "-llua"
+    ]
 
-cmd_args = []
+    cmd = f"g++ {' '.join(srcs)} {' '.join(incdirs)} {' '.join(cmd_args)} -o bin/zake -g"
+    print(cmd)
 
-for src in sources:
-    cmd_args.append(str(src))
+    subprocess.run(cmd, shell=True, check=True)
 
-cmd_args += ["-o", "zake"]
-
-for dir in includedirs:
-    cmd_args.append(f"-I{dir}")
-
-cmd_args += [
-    f"-L{Path(__scriptdir__, 'lua', 'src')} "
-    "-llua"
-]
-
-cmd = f"g++ {' '.join(cmd_args)} -g"
-print(cmd)
-
-subprocess.run(cmd, shell=True, check=True)
+if __name__ == "__main__":
+    if not Path(__scriptdir__, "bin").exists():
+        Path(__scriptdir__, "bin").mkdir(exist_ok=True)
+    build()
