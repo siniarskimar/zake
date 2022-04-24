@@ -41,3 +41,6 @@
 
 # Ignore the main executable 
 /zake
+
+# Ignore bin directory
+/bin/
